@@ -8,9 +8,12 @@ const PLAYER_HP := 20
 ## BOSS_EVERY floors is an "act" that makes monsters tougher.
 const RUN_FLOORS := 20
 const BOSS_EVERY := 5
-## Per act after the first: extra HP (0.5 = +50%) and how far number faces step up (one -> two).
-const HP_SCALE_PER_ACT := 0.5
-const FACE_STEPS_PER_ACT := 1
+
+## Per act: [HP multiplier, how far number faces step up (one -> two)].
+## Tuned by simulation so each act is harder: about 97/95/91/90% per normal fight
+## and 80/68/46/30% per boss, for a player who just puts loot over their weakest faces.
+const NORMAL_SCALING := [[2.0, 0], [2.5, 1], [4.0, 2], [5.5, 3]]
+const BOSS_SCALING := [[1.0, 0], [3.0, 1], [3.5, 3], [5.5, 5]]
 
 ## Each die is [face ids, face types]. Types: -1 blank, 0 attack, 1 defend, 2 heal, 3 magic.
 ## Normal monsters appear from `min_floor` on; bosses only on boss floors.
@@ -23,9 +26,9 @@ const MONSTERS := [
 		[["blank", "one", "one", "one", "two", "two"], [-1, 0, 0, 0, 0, 0]],
 		[["blank", "one", "one", "one", "two", "two"], [-1, 0, 0, 0, 0, 0]],
 	]},
-	{"name": "Treant", "sprite": "treant", "hp": 30, "boss": true, "min_floor": 1, "dice": [
-		[["one", "two", "two", "two", "three", "four"], [0, 0, 0, 0, 0, 0]],
-		[["one", "two", "two", "two", "three", "four"], [1, 1, 1, 1, 1, 1]],
+	{"name": "Treant", "sprite": "treant", "hp": 15, "boss": true, "min_floor": 1, "dice": [
+		[["blank", "one", "one", "one", "two", "two"], [-1, 0, 0, 0, 0, 0]],
+		[["one", "one", "two", "two", "two", "two"], [1, 1, 1, 1, 1, 1]],
 	]},
 ]
 
@@ -56,13 +59,14 @@ static func monster_for_floor(floor_num: int) -> Creature:
 		func(m): return m.boss == boss and floor_num >= m.min_floor).pick_random()
 	@warning_ignore("integer_division")
 	var act := (floor_num - 1) / BOSS_EVERY
+	var scaling: Array = (BOSS_SCALING if boss else NORMAL_SCALING)[act]
 	var dice := []
 	for d in def.dice:
 		var ids := []
 		for id in d[0]:
-			ids.append(_step_number(id, act * FACE_STEPS_PER_ACT))
+			ids.append(_step_number(id, scaling[1]))
 		dice.append(Die.new(ids, d[1]))
-	var hp := ceili(def.hp * (1.0 + HP_SCALE_PER_ACT * act))
+	var hp := ceili(def.hp * scaling[0])
 	return Creature.new(def.name, def.sprite, hp, dice)
 
 
