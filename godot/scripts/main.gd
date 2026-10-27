@@ -4,6 +4,7 @@ extends Control
 var player: Creature
 var monster: Creature
 var loot: Loot
+var kills := 0
 
 ## Die whose bomb/reroll face is waiting for a target.
 var acting_die: Die
@@ -35,11 +36,12 @@ func _ready() -> void:
 
 func _new_game() -> void:
 	player = GameData.new_player()
+	kills = 0
 	_spawn_monster("")
 
 
 func _spawn_monster(message: String) -> void:
-	monster = GameData.random_monster()
+	monster = GameData.random_monster(kills)
 	acting_die = null
 	player.roll_all()
 	monster.roll_all()
@@ -63,6 +65,7 @@ func _on_attack() -> void:
 		restart_button.visible = true
 		_refresh_combat()
 	elif monster.is_dead():
+		kills += 1
 		player.heal()
 		_show_loot("%s The %s is dead!" % [msg, monster.display_name])
 	else:
@@ -118,7 +121,7 @@ func _show_combat() -> void:
 func _refresh_combat() -> void:
 	monster_sprite.texture = null if monster.is_dead() else load("res://art/monsters/%s.png" % monster.sprite)
 	monster_stats.text = "%s\n%s" % [monster.display_name, _stats_text(monster)]
-	player_stats.text = "You\n%s    Scrap %d/%d" % [_stats_text(player), player.scrap, Creature.SCRAP_PER_DIE]
+	player_stats.text = "You\n%s    Scrap %d/%d    Kills %d" % [_stats_text(player), player.scrap, Creature.SCRAP_PER_DIE, kills]
 	_fill_dice_row(monster_dice, monster)
 	_fill_dice_row(player_dice, player)
 
