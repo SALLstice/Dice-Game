@@ -4,7 +4,7 @@ extends Control
 var player: Creature
 var monster: Creature
 var loot: Loot
-var kills := 0
+var floor_num := 1
 
 ## Die whose bomb/reroll face is waiting for a target.
 var acting_die: Die
@@ -36,18 +36,19 @@ func _ready() -> void:
 
 func _new_game() -> void:
 	player = GameData.new_player()
-	kills = 0
+	floor_num = 1
 	_spawn_monster("")
 
 
 func _spawn_monster(message: String) -> void:
-	monster = GameData.random_monster(kills)
+	monster = GameData.monster_for_floor(floor_num)
 	acting_die = null
 	player.roll_all()
 	monster.roll_all()
 	attack_button.disabled = false
 	restart_button.visible = false
-	log_label.text = (message + " " if message else "") + "A %s appears!" % monster.display_name
+	var arrival := "Boss: the %s!" if GameData.is_boss_floor(floor_num) else "A %s appears!"
+	log_label.text = (message + " " if message else "") + "Floor %d. " % floor_num + arrival % monster.display_name
 	_show_combat()
 
 
@@ -65,9 +66,15 @@ func _on_attack() -> void:
 		restart_button.visible = true
 		_refresh_combat()
 	elif monster.is_dead():
-		kills += 1
-		player.heal()
-		_show_loot("%s The %s is dead!" % [msg, monster.display_name])
+		player.hp = player.max_hp
+		if floor_num == GameData.RUN_FLOORS:
+			log_label.text = msg + " You cleared all %d floors. You win!" % GameData.RUN_FLOORS
+			attack_button.disabled = true
+			restart_button.visible = true
+			_refresh_combat()
+		else:
+			floor_num += 1
+			_show_loot("%s The %s is dead! You heal to full." % [msg, monster.display_name])
 	else:
 		player.heal()
 		monster.heal()
@@ -120,8 +127,9 @@ func _show_combat() -> void:
 
 func _refresh_combat() -> void:
 	monster_sprite.texture = null if monster.is_dead() else load("res://art/monsters/%s.png" % monster.sprite)
-	monster_stats.text = "%s\n%s" % [monster.display_name, _stats_text(monster)]
-	player_stats.text = "You\n%s    Scrap %d/%d    Kills %d" % [_stats_text(player), player.scrap, Creature.SCRAP_PER_DIE, kills]
+	var title := monster.display_name + (" (boss)" if GameData.is_boss_floor(floor_num) else "")
+	monster_stats.text = "%s\n%s" % [title, _stats_text(monster)]
+	player_stats.text = "You    Floor %d/%d\n%s    Scrap %d/%d" % [floor_num, GameData.RUN_FLOORS, _stats_text(player), player.scrap, Creature.SCRAP_PER_DIE]
 	_fill_dice_row(monster_dice, monster)
 	_fill_dice_row(player_dice, player)
 
