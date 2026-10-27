@@ -27,10 +27,15 @@ var loot_row: HBoxContainer
 var loot_dice: VBoxContainer
 var skip_button: Button
 
+var die_choice_screen: VBoxContainer
+var die_choice_title: Label
+var die_choice_rows: VBoxContainer
+
 
 func _ready() -> void:
 	_build_combat_screen()
 	_build_loot_screen()
+	_build_die_choice_screen()
 	_new_game()
 
 
@@ -73,8 +78,13 @@ func _on_attack() -> void:
 			restart_button.visible = true
 			_refresh_combat()
 		else:
+			var message := "%s The %s is dead! You heal to full." % [msg, monster.display_name]
+			if GameData.is_boss_floor(floor_num):
+				@warning_ignore("integer_division")
+				_show_die_choice(message, floor_num / GameData.BOSS_EVERY)
+			else:
+				_show_loot(message)
 			floor_num += 1
-			_show_loot("%s The %s is dead! You heal to full." % [msg, monster.display_name])
 	else:
 		player.heal()
 		monster.heal()
@@ -111,6 +121,10 @@ func _use_targeted_face(creature: Creature, target: Die) -> void:
 			face.used = true
 			creature.reroll(target)
 			log_label.text = "Rerolled."
+		"echo":
+			face.used = true
+			creature.echo(target)
+			log_label.text = "Echo: the old face still counts this turn."
 		"bomb":
 			target.set_current(Face.new("blank", Face.Type.BLANK))
 			acting_die.set_current(Face.new("blank", Face.Type.BLANK))
@@ -119,9 +133,13 @@ func _use_targeted_face(creature: Creature, target: Die) -> void:
 	monster.calc_totals()
 
 
+func _show_screen(screen: Control) -> void:
+	for s in [combat_screen, loot_screen, die_choice_screen]:
+		s.get_parent().visible = s == screen
+
+
 func _show_combat() -> void:
-	loot_screen.get_parent().visible = false
-	combat_screen.get_parent().visible = true
+	_show_screen(combat_screen)
 	_refresh_combat()
 
 
@@ -143,6 +161,11 @@ func _fill_dice_row(row: HBoxContainer, creature: Creature) -> void:
 		view.set_selected(die == acting_die)
 		view.clicked.connect(_on_die_clicked.bind(creature, die))
 		row.add_child(view)
+	for face in creature.echoes:
+		var view := DieView.new(face)
+		view.modulate.a = 0.6
+		view.tooltip_text = "Echo of: " + face.description()
+		row.add_child(view)
 
 
 func _stats_text(c: Creature) -> String:
@@ -155,14 +178,35 @@ func _stats_text(c: Creature) -> String:
 
 # --- Loot -----------------------------------------------------------------
 
-func _show_loot(message: String) -> void:
-	loot = Loot.new()
+func _show_loot(message: String, tier := 1) -> void:
+	loot = Loot.new(tier)
 	picked_loot = null
-	loot_title.text = "%s\nPick a face, then click one of your faces to replace it. Or skip and take %d scrap." % [message, loot.scrap]
+	var kind := "a tier %d face" % tier if tier > 1 else "a face"
+	loot_title.text = "%s\nPick %s, then click one of your faces to replace it. Or skip and take %d scrap." % [message, kind, loot.scrap]
 	skip_button.text = "Skip (+%d scrap)" % loot.scrap
-	combat_screen.get_parent().visible = false
-	loot_screen.get_parent().visible = true
+	_show_screen(loot_screen)
 	_refresh_loot()
+
+
+# --- Boss reward: a new die, then a high-tier face -------------------------
+
+func _show_die_choice(message: String, boss_number: int) -> void:
+	die_choice_title.text = "%s\nBoss %d beaten. Choose a new die." % [message, boss_number]
+	_clear(die_choice_rows)
+	for type in [Face.Type.ATTACK, Face.Type.DEFEND]:
+		var die := GameData.boss_die(boss_number, type)
+		var row := HBoxContainer.new()
+		row.add_child(_button("Take %s die" % Face.TYPE_NAMES[type].to_lower(),
+				_on_die_chosen.bind(die, boss_number)))
+		for face in die.faces:
+			row.add_child(DieView.new(face))
+		die_choice_rows.add_child(row)
+	_show_screen(die_choice_screen)
+
+
+func _on_die_chosen(die: Die, boss_number: int) -> void:
+	player.dice.append(die)
+	_show_loot("New die added.", boss_number + 1)
 
 
 func _refresh_loot() -> void:
@@ -267,6 +311,16 @@ func _build_combat_screen() -> void:
 	log_label = Label.new()
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	combat_screen.add_child(log_label)
+
+
+func _build_die_choice_screen() -> void:
+	die_choice_screen = _screen()
+	die_choice_title = Label.new()
+	die_choice_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	die_choice_screen.add_child(die_choice_title)
+	die_choice_rows = VBoxContainer.new()
+	die_choice_rows.add_theme_constant_override("separation", 12)
+	die_choice_screen.add_child(die_choice_rows)
 
 
 func _build_loot_screen() -> void:

@@ -12,6 +12,8 @@ var hp: int
 var dice: Array[Die] = []
 var blank_count := 0
 var totals := {}
+## Old faces kept by Echo this turn. They count on top of the dice.
+var echoes: Array[Face] = []
 var scrap := 0
 
 
@@ -29,6 +31,7 @@ func is_dead() -> bool:
 
 ## Starts a new turn: clears per-turn face state, rolls everything, winds springs.
 func roll_all() -> void:
+	echoes.clear()
 	for die in dice:
 		for face in die.faces:
 			face.reset_turn()
@@ -42,14 +45,19 @@ func roll_all() -> void:
 		for face in die.faces:
 			if face.id == "spring":
 				face.winds_inc = 1 + winders
-		_on_rolled(die)
+		die.current().on_rolled()
 	calc_totals()
 
 
 func reroll(die: Die) -> void:
 	die.roll()
-	_on_rolled(die)
+	die.current().on_rolled()
 	calc_totals()
+
+
+func echo(die: Die) -> void:
+	echoes.append(die.current())
+	reroll(die)
 
 
 func cash_spring(face: Face) -> void:
@@ -59,26 +67,32 @@ func cash_spring(face: Face) -> void:
 	calc_totals()
 
 
-func _on_rolled(die: Die) -> void:
-	var face := die.current()
-	if face.id == "spring":
-		face.winds += face.winds_inc
+## Faces that count this turn: each die's face (a mirror shows the face to its left), then echoes.
+func counting_faces() -> Array[Face]:
+	var faces: Array[Face] = []
+	for i in dice.size():
+		var face := dice[i].current()
+		if face.id == "mirror" and i > 0:
+			face = faces[i - 1]
+		faces.append(face)
+	faces.append_array(echoes)
+	return faces
 
 
 func calc_totals() -> void:
+	var faces := counting_faces()
 	blank_count = 0
-	for die in dice:
-		if die.current().id == "blank":
+	for face in faces:
+		if face.id == "blank":
 			blank_count += 1
 
 	for type in [Face.Type.ATTACK, Face.Type.DEFEND, Face.Type.HEAL, Face.Type.MAGIC]:
 		totals[type] = 0
 	# Tier by tier across every colour, so converters see the finished totals.
 	for tier in Face.TIERS:
-		for die in dice:
-			var face := die.current()
+		for face in faces:
 			if face.type != Face.Type.BLANK and face.priority() == tier:
-				totals[face.type] = face.apply(totals[face.type], self)
+				totals[face.type] = face.apply(totals[face.type], self, faces)
 
 
 ## Returns the damage actually taken after defence.

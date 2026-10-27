@@ -2,6 +2,7 @@ class_name Loot
 extends RefCounted
 ## The faces offered after a kill, and the scrap you get for skipping them.
 ## Rarer faces and colours leave less scrap, as in the Unity invPanelScript.
+## Tier 1 is normal loot; tiers 2-4 are the high-tier faces offered after bosses.
 
 const COUNT := 3
 const SCRAP_PER_FACE := 200
@@ -15,10 +16,15 @@ var faces: Array[Face] = []
 var scrap := SCRAP_PER_FACE * COUNT
 
 
-func _init() -> void:
+func _init(tier := 1) -> void:
+	var weights := Face.LOOT_WEIGHTS
+	if tier > 1:
+		weights = Face.SPECIAL_WEIGHTS.duplicate()
+		for id in Face.TIER_NUMBERS[tier]:
+			weights[id] = Face.TIER_NUMBER_WEIGHT
 	for i in COUNT:
-		var id: String = _weighted_pick(Face.LOOT_WEIGHTS)
-		scrap -= Face.LOOT_WEIGHTS[id]
+		var id: String = _weighted_pick(weights)
+		scrap -= weights[id]
 		var type := Face.Type.BLANK
 		if id in Face.UTILITY:
 			scrap -= UTILITY_SCRAP_COST

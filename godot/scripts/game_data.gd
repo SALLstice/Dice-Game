@@ -38,6 +38,14 @@ static func new_player() -> Creature:
 	])
 
 
+## The die offered after beating boss number `boss_number`: [0,0,0,N,N,N+1] in one colour.
+static func boss_die(boss_number: int, type: int) -> Die:
+	var n := Face.number_id(boss_number)
+	return Die.new(
+		["blank", "blank", "blank", n, n, Face.number_id(boss_number + 1)],
+		[-1, -1, -1, type, type, type])
+
+
 static func is_boss_floor(floor_num: int) -> bool:
 	return floor_num % BOSS_EVERY == 0
 
@@ -62,5 +70,4 @@ static func monster_for_floor(floor_num: int) -> Creature:
 static func _step_number(id: String, steps: int) -> String:
 	if not Face.NUMBERS.has(id):
 		return id
-	var names := Face.NUMBERS.keys()
-	return names[mini(names.find(id) + steps, names.size() - 1)]
+	return Face.number_id(Face.NUMBERS[id] + steps)

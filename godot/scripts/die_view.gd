@@ -27,11 +27,15 @@ func _init(face: Face) -> void:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(icon)
 
-	if face.id == "spring":
+	var caption := face.caption()
+	if caption != "":
 		var badge := Label.new()
-		badge.text = str(face.winds)
-		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		badge.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		badge.text = caption
+		# Placeholder names sit in the middle; counters go in the corner.
+		var centered := face.id in Face.PLACEHOLDERS
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered else HORIZONTAL_ALIGNMENT_RIGHT
+		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER if centered else VERTICAL_ALIGNMENT_BOTTOM
+		badge.add_theme_font_size_override("font_size", 13)
 		badge.add_theme_constant_override("outline_size", 6)
 		badge.add_theme_color_override("font_outline_color", Color.BLACK)
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
